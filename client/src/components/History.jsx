@@ -4,6 +4,8 @@ import ReportCard from "./ReportCard.jsx";
 import ScoreGauge from "./ScoreGauge.jsx";
 import HeaderResults from "./HeaderResults.jsx";
 import DnsResults from "./DnsResults.jsx";
+import ClickjackResult from "./ClickjackResult.jsx";
+import ScriptAudit from "./ScriptAudit.jsx";
 import ClaudePrompt from "./ClaudePrompt.jsx";
 
 function Modal({ scan, onClose }) {
@@ -30,6 +32,8 @@ function Modal({ scan, onClose }) {
           rawHeaders={scan.rawHeaders}
         />
         <DnsResults dnsRaw={scan.dnsRaw} />
+        <ClickjackResult data={scan.clickjackTest} />
+        <ScriptAudit data={scan.scriptAudit} />
         <ClaudePrompt claudePrompt={scan.claudePrompt} />
       </div>
     </div>

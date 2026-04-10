@@ -4,6 +4,8 @@ import { v4 as uuidv4 } from "uuid";
 import { HEADER_CHECKS, scoreHeaders } from "../lib/headerChecks.js";
 import { buildClaudePrompt } from "../lib/promptBuilder.js";
 import { getDb } from "../lib/db.js";
+import { testClickjacking } from "../lib/clickjackTest.js";
+import { auditScripts } from "../lib/scriptAudit.js";
 
 export const scanRouter = Router();
 
@@ -39,7 +41,7 @@ scanRouter.post("/", async (req, res) => {
     return res.status(400).json({ error: "Invalid URL: could not parse hostname." });
   }
 
-  // 7a — Fetch HTTP headers
+  // Step 1 — Fetch HTTP headers (fatal if fails)
   let rawHeaders, parsedHeaders, checkResults, score;
   try {
     const response = await axios.get(
@@ -69,7 +71,7 @@ scanRouter.post("/", async (req, res) => {
     return res.status(502).json({ error: "Could not fetch headers", details: String(details) });
   }
 
-  // 7b — DNS lookup (non-fatal)
+  // Step 2 — DNS lookup (non-fatal)
   let dnsRaw = null;
   try {
     const dnsRes = await axios.get(
@@ -78,13 +80,29 @@ scanRouter.post("/", async (req, res) => {
     );
     dnsRaw = dnsRes.data;
   } catch {
-    // DNS failure is non-fatal — continue with null
+    // non-fatal
   }
 
-  // 7c — Build Claude prompt
-  const claudePrompt = buildClaudePrompt(url, score, checkResults, dnsRaw);
+  // Step 3 — Clickjacking test (non-fatal)
+  let clickjackTest = null;
+  try {
+    clickjackTest = await testClickjacking(url);
+  } catch (err) {
+    clickjackTest = { error: err.message || "Test failed" };
+  }
 
-  // 7d — Save to history
+  // Step 4 — Script audit (non-fatal)
+  let scriptAudit = null;
+  try {
+    scriptAudit = await auditScripts(url);
+  } catch (err) {
+    scriptAudit = { error: err.message || "Audit failed" };
+  }
+
+  // Build Claude prompt
+  const claudePrompt = buildClaudePrompt(url, score, checkResults, dnsRaw, clickjackTest, scriptAudit);
+
+  // Save to history
   const id = uuidv4();
   const record = {
     id,
@@ -95,6 +113,8 @@ scanRouter.post("/", async (req, res) => {
     rawHeaders,
     parsedHeaders,
     dnsRaw,
+    clickjackTest,
+    scriptAudit,
     claudePrompt
   };
 
@@ -106,7 +126,6 @@ scanRouter.post("/", async (req, res) => {
     console.error("Failed to save scan to DB:", err.message);
   }
 
-  // 7e — Response
   return res.json({
     id,
     url,
@@ -115,6 +134,8 @@ scanRouter.post("/", async (req, res) => {
     rawHeaders,
     parsedHeaders,
     dnsRaw,
+    clickjackTest,
+    scriptAudit,
     claudePrompt
   });
 });

@@ -3,11 +3,15 @@ import { runScan } from "../api.js";
 import ScoreGauge from "./ScoreGauge.jsx";
 import HeaderResults from "./HeaderResults.jsx";
 import DnsResults from "./DnsResults.jsx";
+import ClickjackResult from "./ClickjackResult.jsx";
+import ScriptAudit from "./ScriptAudit.jsx";
 import ClaudePrompt from "./ClaudePrompt.jsx";
 
 const STEPS = [
-  "Fetching headers and DNS...",
-  "Building report..."
+  "Fetching headers...",
+  "DNS lookup...",
+  "Clickjacking test...",
+  "Auditing scripts..."
 ];
 
 export default function Scanner() {
@@ -37,14 +41,10 @@ export default function Scanner() {
     setError(null);
     setResult(null);
     setScanning(true);
-    setStep(0);
+    setStep(1);
 
     try {
-      setStep(1);
       const data = await runScan(url.trim());
-      setStep(2);
-      // Small delay so the user sees step 2
-      await new Promise((r) => setTimeout(r, 300));
       setResult(data);
     } catch (err) {
       if (err.status === 429) {
@@ -129,6 +129,8 @@ export default function Scanner() {
             rawHeaders={result.rawHeaders}
           />
           <DnsResults dnsRaw={result.dnsRaw} />
+          <ClickjackResult data={result.clickjackTest} />
+          <ScriptAudit data={result.scriptAudit} />
           <ClaudePrompt claudePrompt={result.claudePrompt} />
         </div>
       )}
